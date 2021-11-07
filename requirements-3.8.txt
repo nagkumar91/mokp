@@ -1,0 +1,9 @@
+certifi
+cmake
+dlib
+imutils
+numpy
+opencv-python
+pygame
+pyqt5
+pywinauto
