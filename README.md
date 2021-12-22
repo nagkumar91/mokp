@@ -8,3 +8,4 @@ Type "s" and press tab, it should complete it to someting like ".\script.bat"
 After the installation succeeds, the program should open and the camera feed starts to appear
 
 
+Inspired by: https://github.com/datkinnguyen/flappybird-mouth
