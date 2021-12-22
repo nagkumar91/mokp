@@ -1,5 +1,8 @@
 import cv2
 import sys
+import warnings
+warnings.simplefilter("ignore", UserWarning)
+sys.coinit_flags = 2
 from PyQt5.QtWidgets import QWidget, QLabel, QApplication
 from PyQt5.QtCore import QThread, Qt, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QImage, QPixmap
@@ -9,16 +12,34 @@ import math
 import time
 import pywinauto
 
-SHAPE_DETECTOR = "shape_predictor_68_face_landmarks.dat"
+SHAPE_DETECTOR = "shape_predictor_68_face_landmarks_GTX.dat"
 PREVIEW_MOUTH_COLOUR = (0, 255, 0)
-MAR_THRESHOLD = 1.5
+MAR_THRESHOLD = 1.25
 (MOUTH_LM_INDEX_START, MOUTH_LM_INDEX_END) = (48, 68)
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(SHAPE_DETECTOR)
 MOUTH_OPEN_MESSAGE = 'open'
 MOUTH_CLOSE_MESSAGE = 'close'
 PREV_STATE = MOUTH_CLOSE_MESSAGE
-KEY_TO_PRESS = '{F14}'
+KEY_TO_PRESS = '{SPACE}'
+
+
+def findCommunicatorApp():
+    app_list = pywinauto.findwindows.find_elements()
+    for app_ in app_list:
+        if 'Communicator' in app_.rich_text:
+            print(f'handle = {app_.handle}')
+            app = pywinauto.Application().connect(handle=app_.handle)
+            print(app)
+            # app.connect(handle=app_.handle)
+            app.top_window().set_focus()
+            return app
+        
+    print('Communicator not found')
+    return None
+
+
+COMMUNICATOR_APP = findCommunicatorApp()
 
 
 def distance(point1, point2):
@@ -58,6 +79,27 @@ class Thread(QThread):
     changePixmap = pyqtSignal(QImage)
     changeLabel = pyqtSignal(str)
 
+    def sameThreadPressKey(self, text):
+        global COMMUNICATOR_APP
+        print(f'Received {text}')
+        if(text == MOUTH_OPEN_MESSAGE):
+            if(COMMUNICATOR_APP == None):
+                COMMUNICATOR_APP = findCommunicatorApp()
+                if(COMMUNICATOR_APP == None):
+                    print('Communicator not found')
+                    return
+                COMMUNICATOR_APP.top_window().type_keys(KEY_TO_PRESS)
+                print("Sent F5 press")
+            else:
+                print(f'app {COMMUNICATOR_APP} found')
+                COMMUNICATOR_APP.top_window().type_keys(KEY_TO_PRESS)
+                print("Sent F5 press")
+
+            # pyautogui.press('space')
+            # self.mouthOpenLabel.setText(text + "clicked space")
+        else:
+            pass
+
     def run(self):
         global PREV_STATE
         cap = cv2.VideoCapture(0)
@@ -82,15 +124,19 @@ class Thread(QThread):
                     mar = mouth_aspect_ratio(mouth)
                     if mar > MAR_THRESHOLD:
                         # mouth is open
+                        print(f'Mouth open prev state - {PREV_STATE}')
                         if PREV_STATE == MOUTH_CLOSE_MESSAGE:
-                            self.changeLabel.emit(MOUTH_OPEN_MESSAGE)
+                            # self.changeLabel.emit(MOUTH_OPEN_MESSAGE)
+                            self.sameThreadPressKey(MOUTH_OPEN_MESSAGE)
                         PREV_STATE = MOUTH_OPEN_MESSAGE
                         # time.sleep(3)
                     else:
+                        print(f'Mouth closed prev state - {PREV_STATE}')
                         # mouth is closed
 
                         if PREV_STATE == MOUTH_OPEN_MESSAGE:
-                            self.changeLabel.emit(MOUTH_CLOSE_MESSAGE)
+                            # self.changeLabel.emit(MOUTH_CLOSE_MESSAGE)
+                            self.sameThreadPressKey(MOUTH_CLOSE_MESSAGE)
                         PREV_STATE = MOUTH_CLOSE_MESSAGE
                         # self.changeLabel.emit(MOUTH_CLOSE_MESSAGE)
 
@@ -125,12 +171,18 @@ class App(QWidget):
                 app.connect(handle=app_.handle)
                 app.top_window().set_focus()
                 return app
+            else:
+                print('Communicator not found')
+                return None
 
     def updateMouthOpenLabel(self, text):
         print(f'Received {text}')
         if(text == MOUTH_OPEN_MESSAGE):
             if(self.communicator_app == None):
                 self.communicator_app = self.findCommunicatorApp()
+                if(self.communicator_app == None):
+                    print('Communicator not found')
+                    return
                 self.communicator_app.top_window().type_keys(KEY_TO_PRESS)
                 print("Sent F5 press")
             else:
